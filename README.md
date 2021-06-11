@@ -1,151 +1,188 @@
-# Testing Microservices in Spring
+# Spring Boot "Microservice" Example Project
 
-[![Build Status](https://travis-ci.org/hamvocke/spring-testing.svg?branch=master)](https://travis-ci.org/hamvocke/spring-testing)
+This is a sample Java / Maven / Spring Boot (version 1.5.6) application that can be used as a starter for creating a microservice complete with built-in health check, metrics and much more. I hope it helps you.
 
-This repository contains a *Spring Boot* application with lots of exemplary tests on different levels of the [Test Pyramid](https://martinfowler.com/bliki/TestPyramid.html). It shows an opinionated way to thoroughly test your spring application by demonstrating different types and levels of testing. You will find that some of the tests are duplicated along the test pyramid -- concepts that have already been tested in lower-level tests will be tested in more high-level tests. This contradicts the premise of the test pyramid. In this case it helps showcasing different kinds of tests which is the main goal of this repository.
+## How to Run 
 
-## Read the Blog Post
-This repository is part of a [series of blog posts](http://www.hamvocke.com/blog/testing-microservices/) I wrote about testing microservices. I highly recommend you read them to get a better feeling for what it takes to test microservices and how you can implement a reliable test suite for a Spring Boot microservice application.
+This application is packaged as a war which has Tomcat 8 embedded. No Tomcat or JBoss installation is necessary. You run it using the ```java -jar``` command.
 
-## Get started
-
-### 1. Set an API Key as Environment Variable
-In order to run the service, you need to set the `WEATHER_API_KEY` environment variable to a valid API key retrieved from ~~darksky.net~~ [openweathermap.org](https://openweathermap.org/).
-
-_Note: in a previous version this example used darksky.net as the weather API. Since they've shut down their API for public access, we've since switched over to openweathermap.org_
-
-A simple way is to rename the `env.sample` file to `.env`, fill in your API key from _openweathermap.org_ and source it before running your application:
-
-```bash
-source .env
+* Clone this repository 
+* Make sure you are using JDK 1.8 and Maven 3.x
+* You can build the project and run the tests by running ```mvn clean package```
+* Once successfully built, you can run the service by one of these two methods:
 ```
-
-### 2. Start a PostgreSQL database
-The easiest way is to use the provided `startDatabase.sh` script. This script starts a Docker container which contains a database with the following configuration:
-    
-  * port: `15432`
-  * username: `testuser`
-  * password: `password`
-  * database name: `postgres`
-  
-If you don't want to use the script make sure to have a database with the same configuration or modify your `application.properties`.
-
-### 3. Run the Application
-Once you've provided the API key and started a PostgreSQL database you can run the application using
-
-```bash
-./gradlew bootRun
+        java -jar -Dspring.profiles.active=test target/spring-boot-rest-example-0.5.0.war
+or
+        mvn spring-boot:run -Drun.arguments="spring.profiles.active=test"
 ```
+* Check the stdout or boot_example.log file to make sure no exceptions are thrown
 
-The application will start on port `8080` so you can send a sample request to `http://localhost:8080/hello` to see if you're up and running.
-
-
-## Application Architecture
+Once the application runs you should see something like this
 
 ```
- ╭┄┄┄┄┄┄┄╮      ┌──────────┐      ┌──────────┐
- ┆   ☁   ┆  ←→  │    ☕     │  ←→  │    💾     │
- ┆  Web  ┆ HTTP │  Spring  │      │ Database │
- ╰┄┄┄┄┄┄┄╯      │  Service │      └──────────┘
-                └──────────┘
-                     ↑ JSON/HTTP
-                     ↓
-                ┌──────────┐
-                │    ☁     │
-                │ Weather  │
-                │   API    │
-                └──────────┘
+2017-08-29 17:31:23.091  INFO 19387 --- [           main] s.b.c.e.t.TomcatEmbeddedServletContainer : Tomcat started on port(s): 8090 (http)
+2017-08-29 17:31:23.097  INFO 19387 --- [           main] com.khoubyari.example.Application        : Started Application in 22.285 seconds (JVM running for 23.032)
 ```
 
-The sample application is almost as easy as it gets. It stores `Person`s in an in-memory database (using _Spring Data_) and provides a _REST_ interface with three endpoints:
+## About the Service
 
-  * `GET /hello`: Returns _"Hello World!"_. Always.
-  * `GET /hello/{lastname}`: Looks up the person with `lastname` as its last name and returns _"Hello {Firstname} {Lastname}"_ if that person is found.
-  * `GET /weather`: Calls a downstream [weather API](https://openweathermap.org/current#name) via HTTP and returns a summary for the current weather conditions in Hamburg, Germany
+The service is just a simple hotel review REST service. It uses an in-memory database (H2) to store the data. You can also do with a relational database like MySQL or PostgreSQL. If your database connection properties work, you can call some REST endpoints defined in ```com.khoubyari.example.api.rest.hotelController``` on **port 8090**. (see below)
 
-### Internal Architecture
-The **Spring Service** itself has a pretty common internal architecture:
+More interestingly, you can start calling some of the operational endpoints (see full list below) like ```/metrics``` and ```/health``` (these are available on **port 8091**)
 
-  * `Controller` classes provide _REST_ endpoints and deal with _HTTP_ requests and responses
-  * `Repository` classes interface with the _database_ and take care of writing and reading data to/from persistent storage
-  * `Client` classes talk to other APIs, in our case it fetches _JSON_ via _HTTP_ from the openweathermap.org weather API
+You can use this sample service to understand the conventions and configurations that allow you to create a DB-backed RESTful service. Once you understand and get comfortable with the sample app you can add your own services following the same patterns as the sample service.
+ 
+Here is what this little application demonstrates: 
 
+* Full integration with the latest **Spring** Framework: inversion of control, dependency injection, etc.
+* Packaging as a single war with embedded container (tomcat 8): No need to install a container separately on the host just run using the ``java -jar`` command
+* Demonstrates how to set up healthcheck, metrics, info, environment, etc. endpoints automatically on a configured port. Inject your own health / metrics info with a few lines of code.
+* Writing a RESTful service using annotation: supports both XML and JSON request / response; simply use desired ``Accept`` header in your request
+* Exception mapping from application exceptions to the right HTTP response with exception details in the body
+* *Spring Data* Integration with JPA/Hibernate with just a few lines of configuration and familiar annotations. 
+* Automatic CRUD functionality against the data source using Spring *Repository* pattern
+* Demonstrates MockMVC test framework with associated libraries
+* All APIs are "self-documented" by Swagger2 using annotations 
 
-  ```
-  Request  ┌────────── Spring Service ───────────┐
-   ─────────→ ┌─────────────┐    ┌─────────────┐ │   ┌─────────────┐
-   ←───────── │  Controller │ ←→ │  Repository │←──→ │  Database   │
-  Response │  └─────────────┘    └─────────────┘ │   └─────────────┘
-           │         ↓                           │
-           │    ┌──────────┐                     │
-           │    │  Client  │                     │
-           │    └──────────┘                     │
-           └─────────│───────────────────────────┘
-                     │
-                     ↓   
-                ┌──────────┐
-                │    ☁     │
-                │ Weather  │
-                │   API    │
-                └──────────┘
-  ```  
+Here are some endpoints you can call:
 
-## Test Layers
-The example applicationn shows different test layers according to the [Test Pyramid](https://martinfowler.com/bliki/TestPyramid.html).
+### Get information about system health, configurations, etc.
 
 ```
-      ╱╲
-  End-to-End
-    ╱────╲
-   ╱ Inte-╲
-  ╱ gration╲
- ╱──────────╲
-╱   Unit     ╲
-──────────────
+http://localhost:8091/env
+http://localhost:8091/health
+http://localhost:8091/info
+http://localhost:8091/metrics
 ```
 
-The base of the pyramid is made up of unit tests. They should make the biggest part of your automated test suite.
-
-The next layer, integration tests, test all places where your application serializes or deserializes data. Your service's REST API, Repositories or calling third-party services are good examples. This codebase contains example for all of these tests.
+### Create a hotel resource
 
 ```
- ╭┄┄┄┄┄┄┄╮      ┌──────────┐      ┌──────────┐
- ┆   ☁   ┆  ←→  │    ☕     │  ←→  │    💾     │
- ┆  Web  ┆      │  Spring  │      │ Database │
- ╰┄┄┄┄┄┄┄╯      │  Service │      └──────────┘
-                └──────────┘
+POST /example/v1/hotels
+Accept: application/json
+Content-Type: application/json
 
-  │    Controller     │      Repository      │
-  └─── Integration ───┴──── Integration ─────┘
+{
+"name" : "Beds R Us",
+"description" : "Very basic, small rooms but clean",
+"city" : "Santa Ana",
+"rating" : 2
+}
 
-  │                                          │
-  └────────────── Acceptance ────────────────┘               
+RESPONSE: HTTP 201 (Created)
+Location header: http://localhost:8090/example/v1/hotels/1
 ```
 
+### Retrieve a paginated list of hotels
+
 ```
- ┌─────────┐  ─┐
- │    ☁    │   │
- │ Weather │   │
- │   API   │   │
- │  Stub   │   │
- └─────────┘   │ Client
-      ↑        │ Integration
-      ↓        │ Test
- ┌──────────┐  │
- │    ☕     │  │
- │  Spring  │  │
- │  Service │  │
- └──────────┘ ─┘
+http://localhost:8090/example/v1/hotels?page=0&size=10
+
+Response: HTTP 200
+Content: paginated list 
 ```
 
-## Tools
-You can find lots of different tools, frameworks and libraries being used in the different examples:
+### Update a hotel resource
 
-  * **Spring Boot**: application framework
-  * **JUnit**: test runner
-  * **Hamcrest Matchers**: assertions
-  * **Mockito**: test doubles (mocks, stubs)
-  * **MockMVC**: testing Spring MVC controllers
-  * **RestAssured**: testing the service end to end via HTTP
-  * **Wiremock**: provide HTTP stubs for downstream services
+```
+PUT /example/v1/hotels/1
+Accept: application/json
+Content-Type: application/json
+
+{
+"name" : "Beds R Us",
+"description" : "Very basic, small rooms but clean",
+"city" : "Santa Ana",
+"rating" : 3
+}
+
+RESPONSE: HTTP 204 (No Content)
+```
+### To view Swagger 2 API docs
+
+Run the server and browse to localhost:8090/swagger-ui.html
+
+# About Spring Boot
+
+Spring Boot is an "opinionated" application bootstrapping framework that makes it easy to create new RESTful services (among other types of applications). It provides many of the usual Spring facilities that can be configured easily usually without any XML. In addition to easy set up of Spring Controllers, Spring Data, etc. Spring Boot comes with the Actuator module that gives the application the following endpoints helpful in monitoring and operating the service:
+
+**/metrics** Shows “metrics” information for the current application.
+
+**/health** Shows application health information.
+
+**/info** Displays arbitrary application info.
+
+**/configprops** Displays a collated list of all @ConfigurationProperties.
+
+**/mappings** Displays a collated list of all @RequestMapping paths.
+
+**/beans** Displays a complete list of all the Spring Beans in your application.
+
+**/env** Exposes properties from Spring’s ConfigurableEnvironment.
+
+**/trace** Displays trace information (by default the last few HTTP requests).
+
+### To view your H2 in-memory datbase
+
+The 'test' profile runs on H2 in-memory database. To view and query the database you can browse to http://localhost:8090/h2-console. Default username is 'sa' with a blank password. Make sure you disable this in your production profiles. For more, see https://goo.gl/U8m62X
+
+# Running the project with MySQL
+
+This project uses an in-memory database so that you don't have to install a database in order to run it. However, converting it to run with another relational database such as MySQL or PostgreSQL is very easy. Since the project uses Spring Data and the Repository pattern, it's even fairly easy to back the same service with MongoDB. 
+
+Here is what you would do to back the services with MySQL, for example: 
+
+### In pom.xml add: 
+
+```
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+        </dependency>
+```
+
+### Append this to the end of application.yml: 
+
+```
+---
+spring:
+  profiles: mysql
+
+  datasource:
+    driverClassName: com.mysql.jdbc.Driver
+    url: jdbc:mysql://<your_mysql_host_or_ip>/bootexample
+    username: <your_mysql_username>
+    password: <your_mysql_password>
+
+  jpa:
+    hibernate:
+      dialect: org.hibernate.dialect.MySQLInnoDBDialect
+      ddl-auto: update # todo: in non-dev environments, comment this out:
+
+
+hotel.service:
+  name: 'test profile:'
+```
+
+### Then run is using the 'mysql' profile:
+
+```
+        java -jar -Dspring.profiles.active=mysql target/spring-boot-rest-example-0.5.0.war
+or
+        mvn spring-boot:run -Drun.jvmArguments="-Dspring.profiles.active=mysql"
+```
+
+# Attaching to the app remotely from your IDE
+
+Run the service with these command line options:
+
+```
+mvn spring-boot:run -Drun.jvmArguments="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005"
+or
+java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005 -Dspring.profiles.active=test -Ddebug -jar target/spring-boot-rest-example-0.5.0.war
+```
+and then you can connect to it remotely using your IDE. For example, from IntelliJ You have to add remote debug configuration: Edit configuration -> Remote.
+
+# Questions and Comments: khoubyari@gmail.com
+
 
